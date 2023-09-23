@@ -1,0 +1,38 @@
+---
+- hosts: localhost
+  vars:
+    timestamp: "{{ lookup('pipe', 'date +%Y%m%d%H%M') }}"
+    db_host: "your_database_host"
+    db_user: "your_database_username"
+    db_password: "your_database_password"
+
+    # Example array of database names
+    db_names:
+      - "db1"
+      - "bd2"
+
+    upload_to_sftp: false
+    sftp_user: "your_sftp_user"
+    sftp_server: "your_sftp_server"
+    sftp_dest: "/path/to/destination/on/sftp"
+
+  tasks:
+    - name: Dump each database from the list from a remote host to a file (with compression)
+      community.postgresql.postgresql_db:
+        name: "{{ item }}"
+        state: dump
+        target: "/tmp/{{ item }}-{{ timestamp }}.sql.gz"
+        login_host: "{{ db_host }}"
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_password }}"
+      loop: "{{ db_names }}"
+      delegate_to: localhost
+
+    - name: Upload each database dump to a remote SFTP server
+      when: upload_to_sftp == true
+      synchronize:
+        src: "/tmp/{{ item }}-{{ timestamp }}.sql.gz"
+        dest: "sftp://{{ sftp_user }}@{{ sftp_server }}{{ sftp_dest }}"
+        mode: push
+      loop: "{{ db_names }}"
+      delegate_to: localhost
